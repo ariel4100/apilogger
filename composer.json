@@ -4,14 +4,14 @@
             "AWT\\": "src/"
         }
     },
-    "name": "awt/apilogger",
+    "name": "mikha-dev/apilogger",
     "description": "Small laravel package for viewing api logs which can be used in debugging.",
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "aung win thant",
-            "email": "agwinthant@gmail.com"
+            "name": "mikha-dev",
+            "email": "mikha.dev@gmail.com"
         }
     ],
     "extra": {
