@@ -2,11 +2,16 @@
 
 namespace AWT;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Psy\Util\Json;
 
 abstract class AbstractLogger{
 
@@ -33,29 +38,35 @@ abstract class AbstractLogger{
             }
         });
     }
+
     /**
      * logs into associative array
      *
-     * @param  $request
-     * @param  $response
+     * @param Request                                $request
+     * @param Response|JsonResponse|RedirectResponse $response
+     *
      * @return array
      */
-    public function logData($request,$response){
+    public function logData(Request $request, Response|JsonResponse|RedirectResponse $response){
         $currentRouteAction = Route::currentRouteAction();
+
+        // Initialiaze controller and action variable before use them
+        $controller = "";
+        $action = "";
 
         /*
          * Some routes will not contain the `@` symbole (e.g. closures, or routes using a single action controller).
          */
         if ($currentRouteAction) {
             if (strpos($currentRouteAction, '@') !== false) {
-                list($controller, $action) = explode('@', $currentRouteAction);
+                [$controller, $action] = explode('@', $currentRouteAction);
             } else {
                 // If we get a string, just use that.
                 if (is_string($currentRouteAction)) {
-                    list ($controller, $action) = ["", $currentRouteAction];
+                    [$controller, $action] = ["", $currentRouteAction];
                 } else {
                     // Otherwise force it to be some type of string using `json_encode`.
-                    list ($controller, $action) = ["", (string)json_encode($currentRouteAction)];
+                    [$controller, $action] = ["", (string)json_encode($currentRouteAction)];
                 }
             }
         }
@@ -72,8 +83,12 @@ abstract class AbstractLogger{
         $this->logs['created_at'] = Carbon::now();
         $this->logs['method'] = $request->method();
         $this->logs['url'] = $request->path();
-        $this->logs['payload'] = json_encode($request->all());
-        $this->logs['response'] = $response->status();
+        $this->logs['payload'] = $this->payload($request);
+        $this->logs['payload_raw'] = config('apilog.payload_raw', false) ? file_get_contents('php://input') : null;
+        $this->logs['headers'] = $this->headers($request);
+        $this->logs['status_code'] = $response->status();
+        $this->logs['response'] = $response->getContent();
+        $this->logs['response_headers'] = $this->headers($response);
         $this->logs['duration'] = number_format($endTime - LARAVEL_START, 3);
         $this->logs['controller'] = $controller;
         $this->logs['action'] = $action;
@@ -82,24 +97,43 @@ abstract class AbstractLogger{
 
         return $this->logs;
     }
+
+
     /**
-     * Helper method for mapping array into models
+     * Formats the request payload for logging
      *
-     * @param array $data
-     * @return ApiLog
+     * @param $request
+     * @return string
      */
-    public function mapArrayToModel(array $data){
-        $model = new ApiLog();
-        $model->created_at = Carbon::make($data[0]);
-        $model->method = $data[1];
-        $model->url = $data[2];
-        $model->payload = $data[3];
-        $model->response = $data[4];
-        $model->duration = $data[5];
-        $model->controller = $data[6];
-        $model->action = $data[7];
-        $model->models = $data[8];
-        $model->ip = $data[9];
-        return $model;
+    protected function payload($request)
+    {
+        $allFields = $request->all();
+
+        foreach (config('apilog.dont_log', []) as $key) {
+            if (array_key_exists($key, $allFields)) {
+                unset($allFields[$key]);
+            }
+        }
+
+        return json_encode($allFields);
+    }
+
+    /**
+     * Formats the headers payload for logging
+     *
+     * @param $request
+     * @return string
+     */
+    protected function headers($request)
+    {
+        $allHeaders = $request->headers->all();
+
+        foreach (config('apilog.dont_log_headers', []) as $key) {
+            if (array_key_exists($key, $allHeaders)) {
+                unset($allHeaders[$key]);
+            }
+        }
+
+        return json_encode($allHeaders);
     }
 }

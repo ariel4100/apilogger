@@ -25,12 +25,14 @@ AWT\Providers\ApiLogServiceProvider::class
 2. Publish the config file with:
 
 ```bash
-php artisan vendor:publish --tag=config
+php artisan vendor:publish --tag=config --provider="AWT\Providers\ApiLogServiceProvider"
 ```
 
 The config file is called *apilogs.php*. Currently supported drivers are *db* and *file*
 
 By default the logger will use *file* to log the data. But if you want to use Database for logging, migrate table by using
+
+You can also configure which fields should not be logged like passwords, secrets, etc.
 
 ***You dont need to migrate if you are just using file driver***
 
@@ -59,8 +61,18 @@ php artisan apilog:clear
 
 1. Your driver class ***must*** implement ApiLoggerInterface for saving, retrieving and deleting the logs.
 2. Your driver class may extends `AbstractLogger` class which provide helpful methods such as logData and mapArrayToModel.
+3. Substitude in your new class name instead of `db` or `file` as the driver. eg: `\App\Apilogs\CustomLogger::class`
 
 ## Security
+### Add Auth
+In config/apilog.php you have 'route' option, you can change the prefix and add auth middleware or any other middleware
+```php
+'route'          => [
+    'prefix'     => 'apilogs',
+    'middleware' => null,//Can be change to ['auth'] or others
+]
+```
+
 
 If you discover any security related issues, please email agwinthant@gmail.com instead of using the issue tracker.
 
